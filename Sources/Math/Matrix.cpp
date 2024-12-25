@@ -112,24 +112,49 @@ Matrix Matrix::operator+(const Matrix& other) const {
 
 
 Matrix Matrix::operator*(const Matrix& other) const {
-    std::vector<std::vector<double>> currentMatrix = this->GetStd();
-    const std::vector<std::vector<double>> otherMatrix = other.GetStd();
-    if (currentMatrix[0].size() != otherMatrix.size()) {
-        std::cout << "[LOG] [ERROR] Matrices cannot be multiplied: inconsistent sizes! ";
-        return Matrix(std::vector<std::vector<double>>{{0}});
+    if (m_ColsCount != other.GetRowsCount()) {
+        std::cout << "[LOG] [ERROR] Matrices cannot be multiplied: inconsistent sizes!\n";
+        return Matrix(std::vector<std::vector<double>>{{0.0}});
     }
-    const uint32_t rows = currentMatrix.size();
-    const uint32_t cols = otherMatrix[0].size();
-    const uint32_t commonDim = currentMatrix[0].size();
-    std::vector<std::vector<double>> resultMatrix(rows, std::vector<double>(cols, 0.0));
-    for (size_t i = 0; i < rows; ++i) {
-        for (size_t j = 0; j < cols; ++j) {
-            for (size_t k = 0; k < commonDim; ++k) {
-                resultMatrix[i][j] += currentMatrix[i][k] * otherMatrix[k][j];
+
+    std::vector<double> resultValues;
+    std::vector<uint32_t> resultColsIdx;
+    std::vector<uint32_t> resultRowPtr(m_RowsCount + 1, 0);
+
+    const std::vector<double>& otherValues = other.GetValues();
+    const std::vector<uint32_t>& otherColsIdx = other.GetColsIdx();
+    const std::vector<uint32_t>& otherRowPtr = other.GetRowPtr();
+
+    for (uint32_t row = 0; row < m_RowsCount; ++row) {
+        std::vector<double> rowResult(m_ColsCount, 0.0);
+
+        const uint32_t startIdx = m_RowPtr[row];
+        const uint32_t endIdx = m_RowPtr[row + 1];
+
+        for (uint32_t idx = startIdx; idx < endIdx; ++idx) {
+            double value = m_Values[idx];
+            uint32_t col = m_ColsIdx[idx];
+
+            const uint32_t otherStartIdx = otherRowPtr[col];
+            const uint32_t otherEndIdx = otherRowPtr[col + 1];
+
+            for (uint32_t otherIdx = otherStartIdx; otherIdx < otherEndIdx; ++otherIdx) {
+                uint32_t otherCol = otherColsIdx[otherIdx];
+                rowResult[otherCol] += value * otherValues[otherIdx];
             }
         }
+
+        for (uint32_t col = 0; col < m_ColsCount; ++col) {
+            if (rowResult[col] != 0.0) {
+                resultValues.push_back(rowResult[col]);
+                resultColsIdx.push_back(col);
+            }
+        }
+
+        resultRowPtr[row + 1] = resultValues.size();
     }
-    return Matrix(resultMatrix);
+
+    return Matrix(m_RowsCount, other.GetColsCount(), resultValues, resultColsIdx, resultRowPtr);
 }
 
 std::vector<std::vector<double>> Matrix::GetStd() const {
@@ -176,3 +201,4 @@ double Matrix::DeterminantRecursive(const std::vector<std::vector<double>>& matr
     }
     return det;
 }
+
